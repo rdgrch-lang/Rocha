@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Configuração da página
+# Configuração da página para aproveitar o espaço horizontal
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
-# Inicialização de dados
+# Inicialização de dados e categorias
 if 'cat_entrada' not in st.session_state:
     st.session_state.cat_entrada = ["Salário", "Cartão Alimentação"]
 if 'cat_saida' not in st.session_state:
@@ -13,13 +13,13 @@ if 'cat_saida' not in st.session_state:
 if 'dados' not in st.session_state:
     st.session_state.dados = pd.DataFrame(columns=['Tipo', 'Valor', 'Categoria'])
 
-st.title("💰 Painel Financeiro Familiar")
+st.title("💰 Painel de Controle Financeiro")
 
-aba_in, aba_out, aba_graf = st.tabs(["📈 Entradas", "📉 Saídas", "📊 Análise Gráfica"])
+aba_in, aba_out, aba_graf = st.tabs(["📈 Entradas", "📉 Saídas", "📊 Análise de Dados"])
 
-# --- ABA DE ENTRADAS ---
+# --- REGISTRO DE ENTRADAS ---
 with aba_in:
-    st.subheader("Nova Entrada")
+    st.subheader("Adicionar Entrada")
     val_in = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="val_in")
     cat_in = st.selectbox("Tipo", st.session_state.cat_entrada + ["Outra..."], key="cat_in")
     
@@ -32,11 +32,11 @@ with aba_in:
     if st.button("Confirmar Entrada", key="btn_save_in"):
         novo = pd.DataFrame([["Entrada", val_in, cat_in]], columns=['Tipo', 'Valor', 'Categoria'])
         st.session_state.dados = pd.concat([st.session_state.dados, novo], ignore_index=True)
-        st.success("Entrada salva!")
+        st.success("Entrada salva com sucesso!")
 
-# --- ABA DE SAÍDAS ---
+# --- REGISTRO DE SAÍDAS ---
 with aba_out:
-    st.subheader("Nova Saída")
+    st.subheader("Adicionar Saída")
     val_out = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="val_out")
     cat_out = st.selectbox("Tipo", st.session_state.cat_saida + ["Outra..."], key="cat_out")
     
@@ -49,16 +49,17 @@ with aba_out:
     if st.button("Confirmar Saída", key="btn_save_out"):
         novo = pd.DataFrame([["Saída", val_out, cat_out]], columns=['Tipo', 'Valor', 'Categoria'])
         st.session_state.dados = pd.concat([st.session_state.dados, novo], ignore_index=True)
-        st.warning("Saída registrada!")
+        st.warning("Gasto registrado!")
 
-# --- ABA DE GRÁFICOS PARALELOS ---
+# --- VISUALIZAÇÃO GRÁFICA ---
 with aba_graf:
     if not st.session_state.dados.empty:
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([3, 2]) # Aumentei o espaço para o gráfico de barras
 
         with col1:
-            st.subheader("Categorias Detalhadas")
-            # Definindo paletas
+            st.subheader("Detalhamento por Categoria")
+            
+            # Criando o mapa de cores para as barras
             cores_frias = ['#0000FF', '#008000', '#00CED1', '#4682B4']
             cores_quentes = ['#FF0000', '#FF4500', '#DC143C', '#FF69B4']
             
@@ -68,20 +69,21 @@ with aba_graf:
             for i, cat in enumerate(st.session_state.cat_saida):
                 color_map[cat] = cores_quentes[i % len(cores_quentes)]
             
-            fig_det = px.pie(
-                st.session_state.dados, 
-                values='Valor', 
-                names='Categoria',
+            # Gráfico de Barras Detalhado
+            fig_bar = px.bar(
+                st.session_state.dados,
+                x='Categoria',
+                y='Valor',
                 color='Categoria',
                 color_discrete_map=color_map,
-                hole=0.3
+                text_auto='.2f', # Mostra o valor em cima da barra
+                title="Valores por Categoria"
             )
-            # A mágica aqui: mostra o nome (label) em vez de porcentagem
-            fig_det.update_traces(textinfo='label')
-            st.plotly_chart(fig_det, use_container_width=True)
+            fig_bar.update_layout(showlegend=False) # Remove legenda para limpar o visual
+            st.plotly_chart(fig_bar, use_container_width=True)
 
         with col2:
-            st.subheader("Entradas vs Saídas (Global)")
+            st.subheader("Resumo Global")
             resumo = st.session_state.dados.groupby("Tipo")["Valor"].sum().reset_index()
             
             fig_global = px.pie(
@@ -90,13 +92,13 @@ with aba_graf:
                 names='Tipo',
                 color='Tipo',
                 color_discrete_map={"Entrada": "blue", "Saída": "red"},
-                hole=0.3
+                hole=0.4
             )
-            fig_global.update_traces(textinfo='label+value')
+            fig_global.update_traces(textinfo='label+percent')
             st.plotly_chart(fig_global, use_container_width=True)
             
-        st.write("---")
-        st.write("### Histórico de Lançamentos")
+        st.divider()
+        st.write("### Histórico Completo")
         st.dataframe(st.session_state.dados, use_container_width=True)
     else:
-        st.info("Lance algum valor para visualizar os gráficos.")
+        st.info("Nenhum dado para exibir. Comece lançando valores nas abas de Entrada ou Saída.")
