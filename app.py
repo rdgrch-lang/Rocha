@@ -80,5 +80,5 @@ with aba_graf:
         col1, col2 = st.columns(2)
         with col1:
             st.write("**Resumo por Categoria**")
-            fig_bar = px.bar(df_transactions, x='Category', y='Value', color='Type',
-                             color_discrete_map
+            fig_bar = px.bar(df_transactions, x='Category', y='Value', color='Type', color_discrete_map={"Income": "blue", "Expense": "red"})
+                            
