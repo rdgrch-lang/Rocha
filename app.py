@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_gsheets_connection import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
@@ -7,112 +8,105 @@ import calendar
 # Configuração da página
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
-# Inicialização de dados e categorias
-if 'cat_entrada' not in st.session_state:
-    st.session_state.cat_entrada = ["Salário", "Cartão Alimentação"]
-if 'cat_saida' not in st.session_state:
-    st.session_state.cat_saida = ["Cafezinho", "Despesa", "Parcela do Carro"]
-if 'dados' not in st.session_state:
-    # Adicionada a coluna 'Data' na estrutura
-    st.session_state.dados = pd.DataFrame(columns=['Data', 'Tipo', 'Valor', 'Categoria'])
+# Conexão com o Google Sheets
+# O URL abaixo é o que você me passou
+url = "https://docs.google.com/spreadsheets/d/1RA2_tIBjRvT6Dhou3Rc1rJvVF40yJuy1/edit?usp=sharing"
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-st.title("💰 Gestão Financeira Inteligente")
+# --- FUNÇÃO PARA LER DADOS ---
+def carregar_dados():
+    df_lanc = conn.read(spreadsheet=url, worksheet="Lancamentos")
+    df_cat = conn.read(spreadsheet=url, worksheet="Categorias")
+    # Garantir que a coluna Data seja do tipo datetime
+    df_lanc['Data'] = pd.to_datetime(df_lanc['Data'])
+    return df_lanc, df_cat
+
+df_lancamentos, df_categorias = carregar_dados()
+
+st.title("💰 Gestão Financeira Rocha (Nuvem)")
 
 aba_in, aba_out, aba_graf = st.tabs(["📈 Entradas", "📉 Saídas", "📊 Relatório Mensal"])
-
-# --- DATA ATUAL E LIMITES DO MÊS ---
-hoje = datetime.now()
-primeiro_dia = hoje.replace(day=1).date()
-ultimo_dia = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1]).date()
 
 # --- REGISTRO DE ENTRADAS ---
 with aba_in:
     st.subheader("Registrar Entrada")
     val_in = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="val_in")
-    cat_in = st.selectbox("Tipo", st.session_state.cat_entrada + ["Outra..."], key="cat_in")
+    
+    cats_in = df_categorias[df_categorias['Tipo'] == 'Entrada']['Categoria'].tolist()
+    cat_in = st.selectbox("Tipo", cats_in + ["Outra..."], key="cat_in")
     
     if cat_in == "Outra...":
         nova = st.text_input("Nome da nova entrada:")
-        if st.button("Adicionar Categoria", key="btn_add_in"):
-            st.session_state.cat_entrada.append(nova)
+        if st.button("Adicionar Categoria"):
+            nova_cat = pd.DataFrame([["Entrada", nova]], columns=['Tipo', 'Categoria'])
+            df_cat_updated = pd.concat([df_categorias, nova_cat])
+            conn.update(spreadsheet=url, worksheet="Categorias", data=df_cat_updated)
+            st.success("Categoria adicionada! O app vai reiniciar.")
             st.rerun()
             
-    if st.button("Confirmar Entrada", key="btn_save_in"):
-        # Captura a data automática aqui
-        data_atual = hoje.date()
-        novo = pd.DataFrame([[data_atual, "Entrada", val_in, cat_in]], 
-                            columns=['Data', 'Tipo', 'Valor', 'Categoria'])
-        st.session_state.dados = pd.concat([st.session_state.dados, novo], ignore_index=True)
-        st.success(f"Entrada de R$ {val_in:.2f} salva em {data_atual.strftime('%d/%m/%Y')}!")
+    if st.button("Confirmar Entrada"):
+        nova_linha = pd.DataFrame([[datetime.now().date(), "Entrada", val_in, cat_in]], 
+                                  columns=['Data', 'Tipo', 'Valor', 'Categoria'])
+        df_final = pd.concat([df_lancamentos, nova_linha])
+        conn.update(spreadsheet=url, worksheet="Lancamentos", data=df_final)
+        st.success("Salvo no Google Sheets!")
+        st.rerun()
 
 # --- REGISTRO DE SAÍDAS ---
 with aba_out:
     st.subheader("Registrar Saída")
     val_out = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="val_out")
-    cat_out = st.selectbox("Tipo", st.session_state.cat_saida + ["Outra..."], key="cat_out")
+    
+    cats_out = df_categorias[df_categorias['Tipo'] == 'Saída']['Categoria'].tolist()
+    cat_out = st.selectbox("Tipo", cats_out + ["Outra..."], key="cat_out")
     
     if cat_out == "Outra...":
         nova_s = st.text_input("Nome da nova saída:")
-        if st.button("Adicionar Categoria", key="btn_add_out"):
-            st.session_state.cat_saida.append(nova_s)
+        if st.button("Adicionar Categoria", key="btn_out"):
+            nova_cat_s = pd.DataFrame([["Saída", nova_s]], columns=['Tipo', 'Categoria'])
+            df_cat_updated = pd.concat([df_categorias, nova_cat_s])
+            conn.update(spreadsheet=url, worksheet="Categorias", data=df_cat_updated)
             st.rerun()
 
-    if st.button("Confirmar Saída", key="btn_save_out"):
-        data_atual = hoje.date()
-        novo = pd.DataFrame([[data_atual, "Saída", val_out, cat_out]], 
-                            columns=['Data', 'Tipo', 'Valor', 'Categoria'])
-        st.session_state.dados = pd.concat([st.session_state.dados, novo], ignore_index=True)
-        st.warning(f"Saída de R$ {val_out:.2f} registrada em {data_atual.strftime('%d/%m/%Y')}!")
+    if st.button("Confirmar Saída"):
+        nova_linha = pd.DataFrame([[datetime.now().date(), "Saída", val_out, cat_out]], 
+                                  columns=['Data', 'Tipo', 'Valor', 'Categoria'])
+        df_final = pd.concat([df_lancamentos, nova_linha])
+        conn.update(spreadsheet=url, worksheet="Lancamentos", data=df_final)
+        st.warning("Gasto registrado na planilha!")
+        st.rerun()
 
 # --- RELATÓRIO MENSAL ---
 with aba_graf:
+    hoje = datetime.now()
+    primeiro_dia = hoje.replace(day=1).date()
+    ultimo_dia = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1]).date()
+    
     st.subheader(f"📅 Relatório: {hoje.strftime('%B / %Y')}")
-    st.info(f"Período: {primeiro_dia.strftime('%d/%m/%Y')} até {ultimo_dia.strftime('%d/%m/%Y')}")
 
-    if not st.session_state.dados.empty:
-        # Converter coluna Data para o formato correto caso necessário
-        df = st.session_state.dados.copy()
-        df['Data'] = pd.to_datetime(df['Data']).dt.date
-        
-        # Filtrar apenas dados do mês atual
-        df_mes = df[(df['Data'] >= primeiro_dia) & (df['Data'] <= ultimo_dia)]
+    if not df_lancamentos.empty:
+        df_mes = df_lancamentos[(df_lancamentos['Data'].dt.date >= primeiro_dia) & 
+                                (df_lancamentos['Data'].dt.date <= ultimo_dia)]
 
         if not df_mes.empty:
             col1, col2 = st.columns([3, 2])
-
             with col1:
-                st.write("**Gastos e Entradas Detalhados**")
-                cores_frias = ['#0000FF', '#008000', '#00CED1', '#4682B4']
-                cores_quentes = ['#FF0000', '#FF4500', '#DC143C', '#FF69B4']
-                
-                color_map = {}
-                for i, cat in enumerate(st.session_state.cat_entrada):
-                    color_map[cat] = cores_frias[i % len(cores_frias)]
-                for i, cat in enumerate(st.session_state.cat_saida):
-                    color_map[cat] = cores_quentes[i % len(cores_quentes)]
-                
-                fig_bar = px.bar(
-                    df_mes, x='Categoria', y='Valor', color='Categoria',
-                    color_discrete_map=color_map, text_auto='.2f'
-                )
-                fig_bar.update_layout(showlegend=False)
+                st.write("**Gastos Detalhados (Barras)**")
+                # Lógica de cores frias/quentes baseada no que você pediu
+                fig_bar = px.bar(df_mes, x='Categoria', y='Valor', color='Tipo',
+                                 color_discrete_map={"Entrada": "blue", "Saída": "red"}, 
+                                 text_auto='.2f')
                 st.plotly_chart(fig_bar, use_container_width=True)
 
             with col2:
-                st.write("**Balanço Geral do Mês**")
+                st.write("**Balanço Geral (Pizza)**")
                 resumo = df_mes.groupby("Tipo")["Valor"].sum().reset_index()
-                fig_global = px.pie(
-                    resumo, values='Valor', names='Tipo',
-                    color='Tipo', color_discrete_map={"Entrada": "blue", "Saída": "red"},
-                    hole=0.4
-                )
-                fig_global.update_traces(textinfo='label+percent')
-                st.plotly_chart(fig_global, use_container_width=True)
+                fig_pie = px.pie(resumo, values='Valor', names='Tipo', hole=0.4,
+                                 color='Tipo', color_discrete_map={"Entrada": "blue", "Saída": "red"})
+                st.plotly_chart(fig_pie, use_container_width=True)
             
             st.divider()
-            st.write("### 📝 Histórico de Lançamentos do Mês")
+            st.write("### Histórico do Mês")
             st.dataframe(df_mes.sort_values(by='Data', ascending=False), use_container_width=True)
         else:
-            st.warning("Nenhum lançamento encontrado para o mês atual.")
-    else:
-        st.info("Lance algum valor para ativar o relatório.")
+            st.info("Sem dados para este mês.")
