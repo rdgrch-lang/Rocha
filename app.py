@@ -27,7 +27,8 @@ def carregar_dados():
         
         return df_t, df_c
     except Exception as e:
-        st.error("Aguardando conexão... Verifique se as abas se chamam 'Transactions' e 'Categories' no Google Sheets.")
+        # AGORA ELE VAI MOSTRAR O ERRO REAL NA TELA!
+        st.error(f"🚨 O GOOGLE DISSE O SEGUINTE: {e}")
         return pd.DataFrame(columns=['Date', 'Type', 'Value', 'Category']), pd.DataFrame(columns=['Type', 'Category'])
 
 df_transactions, df_categories = carregar_dados()
