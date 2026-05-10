@@ -6,16 +6,14 @@ from datetime import datetime
 
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
-# Link da sua planilha
 url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
-
-# Criando a conexão
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def carregar_dados():
     try:
-        df_t = conn.read(spreadsheet=url, worksheet="Transactions", ttl="0s")
-        df_c = conn.read(spreadsheet=url, worksheet="Categories", ttl="0s")
+        # Mantemos os 10s para proteção, mas agora com o limpador automático!
+        df_t = conn.read(spreadsheet=url, worksheet="Transactions", ttl="10s")
+        df_c = conn.read(spreadsheet=url, worksheet="Categories", ttl="10s")
         
         if not df_t.empty and 'Date' in df_t.columns:
             df_t['Date'] = pd.to_datetime(df_t['Date'], dayfirst=True, errors='coerce')
@@ -32,6 +30,9 @@ st.title("💰 Gestão Rocha")
 
 aba_in, aba_out, aba_graf = st.tabs(["📈 Entradas", "📉 Saídas", "📊 Relatórios"])
 
+# Garante que a data salva será sempre no padrão BR
+hoje = datetime.now().strftime("%d/%m/%Y")
+
 # --- ABA DE ENTRADAS ---
 with aba_in:
     st.subheader("Inserir Valor Recebido")
@@ -40,28 +41,26 @@ with aba_in:
     list_cat_in = df_categories[df_categories['Type'] == 'Income']['Category'].tolist() if not df_categories.empty else []
     cat_in = st.selectbox("Selecione a Entrada", list_cat_in + ["Outra..."], key="in_cat")
     
-    # Se escolher "Outra...", abre o campo para digitar
     if cat_in == "Outra...":
-        nova_cat_in = st.text_input("📝 Digite o nome da nova Entrada (Ex: Venda, Bônus):", key="new_in_cat")
-        cat_final_in = nova_cat_in
+        cat_final_in = st.text_input("📝 Digite o NOME da nova Entrada:", key="new_in_cat")
     else:
         cat_final_in = cat_in
     
     if st.button("Inserir Entrada", key="btn_save_in"):
-        if val_in > 0 and cat_final_in:
-            # 1. Grava a transação
-            new_row = pd.DataFrame([[datetime.now().date(), "Income", val_in, cat_final_in]], 
-                                   columns=['Date', 'Type', 'Value', 'Category'])
+        # Bloqueia gravar se o nome for vazio ou se chamar literalmente "Outra..."
+        if val_in > 0 and cat_final_in and cat_final_in != "Outra...":
+            new_row = pd.DataFrame([[hoje, "Income", val_in, cat_final_in]], columns=['Date', 'Type', 'Value', 'Category'])
             df_final = pd.concat([df_transactions, new_row], ignore_index=True)
             conn.update(spreadsheet=url, worksheet="Transactions", data=df_final)
             
-            # 2. Se for categoria nova, salva ela na aba Categories
             if cat_in == "Outra...":
                 new_cat_row = pd.DataFrame([["Income", cat_final_in]], columns=['Type', 'Category'])
                 df_cat_final = pd.concat([df_categories, new_cat_row], ignore_index=True)
                 conn.update(spreadsheet=url, worksheet="Categories", data=df_cat_final)
-                
-            st.success(f"Entrada de R$ {val_in} em '{cat_final_in}' inserida com sucesso!")
+            
+            # MAGIA AQUI: Limpa a memória para o gráfico atualizar na hora!
+            st.cache_data.clear() 
+            st.success(f"Entrada de R$ {val_in} em '{cat_final_in}' registrada!")
             st.rerun()
 
 # --- ABA DE SAÍDAS ---
@@ -72,27 +71,24 @@ with aba_out:
     list_cat_out = df_categories[df_categories['Type'] == 'Expense']['Category'].tolist() if not df_categories.empty else []
     cat_out = st.selectbox("Selecione o tipo de Gasto", list_cat_out + ["Outra..."], key="out_cat")
     
-    # Se escolher "Outra...", abre o campo para digitar
     if cat_out == "Outra...":
-        nova_cat_out = st.text_input("📝 Digite o nome do novo Gasto (Ex: Doces, Viagem, Conta de Luz):", key="new_out_cat")
-        cat_final_out = nova_cat_out
+        cat_final_out = st.text_input("📝 Digite o NOME do novo Gasto:", key="new_out_cat")
     else:
         cat_final_out = cat_out
     
     if st.button("Inserir Saída", key="btn_save_out"):
-        if val_out > 0 and cat_final_out:
-            # 1. Grava a transação
-            new_row = pd.DataFrame([[datetime.now().date(), "Expense", val_out, cat_final_out]], 
-                                   columns=['Date', 'Type', 'Value', 'Category'])
+        if val_out > 0 and cat_final_out and cat_final_out != "Outra...":
+            new_row = pd.DataFrame([[hoje, "Expense", val_out, cat_final_out]], columns=['Date', 'Type', 'Value', 'Category'])
             df_final = pd.concat([df_transactions, new_row], ignore_index=True)
             conn.update(spreadsheet=url, worksheet="Transactions", data=df_final)
             
-            # 2. Se for categoria nova, salva ela na aba Categories
             if cat_out == "Outra...":
                 new_cat_row = pd.DataFrame([["Expense", cat_final_out]], columns=['Type', 'Category'])
                 df_cat_final = pd.concat([df_categories, new_cat_row], ignore_index=True)
                 conn.update(spreadsheet=url, worksheet="Categories", data=df_cat_final)
                 
+            # MAGIA AQUI TAMBÉM: Limpa a memória!
+            st.cache_data.clear() 
             st.warning(f"Gasto de R$ {val_out} com '{cat_final_out}' registrado!")
             st.rerun()
 
@@ -116,9 +112,11 @@ with aba_graf:
             
             st.divider()
             st.write("### Histórico")
-            st.dataframe(df_transactions, use_container_width=True)
+            df_view = df_transactions.copy()
+            df_view['Date'] = df_view['Date'].dt.strftime('%d/%m/%Y')
+            st.dataframe(df_view.sort_values(by='Date', ascending=False), use_container_width=True)
         except Exception as e:
-            st.error(f"Erro ao gerar gráficos: {e}")
+            st.error(f"Erro ao gerar gráficos. Tente lançar um novo valor para corrigir os dados antigos. Detalhe: {e}")
     else:
-        st.info("Ainda não há dados para gerar os gráficos. Insira uma entrada ou saída primeiro!")
+        st.info("Ainda não há dados para gerar os gráficos.")
                             
