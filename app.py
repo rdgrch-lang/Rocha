@@ -10,24 +10,24 @@ st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 # Link da sua planilha Google
 url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
 
-# Criando a conexão (Corrigido para a versão nova)
+# Criando a conexão (Importante: a linha 2 do import deve estar correta no seu arquivo)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- FUNÇÃO PARA CARREGAR DADOS ---
 def carregar_dados():
     try:
-        # Busca abas com nomes em inglês para evitar erros de sistema
+        # Busca abas com nomes em inglês para máxima estabilidade
         df_t = conn.read(spreadsheet=url, worksheet="Transactions", ttl="0s")
         df_c = conn.read(spreadsheet=url, worksheet="Categories", ttl="0s")
         
         if not df_t.empty and 'Date' in df_t.columns:
-            # Garante que o sistema entenda que o dia vem antes do mês (Brasil)
+            # Garante que o sistema entenda o formato de data brasileiro (Dia primeiro)
             df_t['Date'] = pd.to_datetime(df_t['Date'], dayfirst=True, errors='coerce')
             df_t = df_t.dropna(subset=['Date'])
         
         return df_t, df_c
     except Exception as e:
-        st.error(f"Erro de conexão: Verifique se as abas se chamam 'Transactions' e 'Categories'.")
+        st.error("Aguardando conexão... Verifique se as abas se chamam 'Transactions' e 'Categories' no Google Sheets.")
         return pd.DataFrame(columns=['Date', 'Type', 'Value', 'Category']), pd.DataFrame(columns=['Type', 'Category'])
 
 df_transactions, df_categories = carregar_dados()
