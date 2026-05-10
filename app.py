@@ -7,7 +7,7 @@ from datetime import datetime
 # Configuração da página
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
-# Link da sua planilha Google nativa
+# Link da sua planilha (Já convertida para nativa)
 url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
 
 # Conexão
@@ -16,17 +16,18 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 # --- FUNÇÃO PARA CARREGAR DADOS ---
 def carregar_dados():
     try:
-        # Busca as abas com os nomes novos em inglês
+        # Busca as abas com os novos nomes em inglês
         df_t = conn.read(spreadsheet=url, worksheet="Transactions", ttl="0s")
         df_c = conn.read(spreadsheet=url, worksheet="Categories", ttl="0s")
         
         if not df_t.empty and 'Date' in df_t.columns:
+            # Garante leitura correta da data (Dia primeiro)
             df_t['Date'] = pd.to_datetime(df_t['Date'], dayfirst=True, errors='coerce')
             df_t = df_t.dropna(subset=['Date'])
         
         return df_t, df_c
     except Exception as e:
-        st.error(f"Erro de conexão: Verifique se as abas se chamam 'Transactions' e 'Categories'.")
+        st.error("Aguardando conexão... Verifique se as abas se chamam 'Transactions' e 'Categories'.")
         return pd.DataFrame(columns=['Date', 'Type', 'Value', 'Category']), pd.DataFrame(columns=['Type', 'Category'])
 
 df_transactions, df_categories = carregar_dados()
@@ -40,7 +41,7 @@ with aba_in:
     st.subheader("Inserir Valor Recebido")
     val_in = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="in_val")
     
-    # Filtra por 'Income'
+    # Filtra por 'Income' na planilha
     list_cat_in = df_categories[df_categories['Type'] == 'Income']['Category'].tolist() if not df_categories.empty else []
     cat_in = st.selectbox("Selecione a Entrada", list_cat_in + ["Outra..."], key="in_cat")
     
@@ -58,7 +59,7 @@ with aba_out:
     st.subheader("Inserir Gasto")
     val_out = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="out_val")
     
-    # Filtra por 'Expense'
+    # Filtra por 'Expense' na planilha
     list_cat_out = df_categories[df_categories['Type'] == 'Expense']['Category'].tolist() if not df_categories.empty else []
     cat_out = st.selectbox("Selecione o tipo de Gasto", list_cat_out + ["Outra..."], key="out_cat")
     
@@ -68,7 +69,7 @@ with aba_out:
                                    columns=['Date', 'Type', 'Value', 'Category'])
             df_final = pd.concat([df_transactions, new_row], ignore_index=True)
             conn.update(spreadsheet=url, worksheet="Transactions", data=df_final)
-            st.warning("Saída inserida!")
+            st.warning("Gasto inserido!")
             st.rerun()
 
 # --- ABA DE RELATÓRIOS ---
@@ -76,7 +77,7 @@ with aba_graf:
     if not df_transactions.empty:
         col1, col2 = st.columns(2)
         with col1:
-            st.write("**Gastos por Categoria**")
+            st.write("**Resumo por Categoria**")
             fig_bar = px.bar(df_transactions, x='Category', y='Value', color='Type',
                              color_discrete_map={"Income": "blue", "Expense": "red"})
             st.plotly_chart(fig_bar, use_container_width=True)
@@ -93,4 +94,4 @@ with aba_graf:
         df_view['Date'] = df_view['Date'].dt.strftime('%d/%m/%Y')
         st.dataframe(df_view.sort_values(by='Date', ascending=False), use_container_width=True)
     else:
-        st.info("Nenhum dado encontrado nas abas 'Transactions' e 'Categories'.")
+        st.info("Nenhum dado encontrado para gerar gráficos.")
