@@ -9,7 +9,7 @@ import calendar
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
 # Link da sua planilha (Já configurado com o link que você mandou)
-url = "https://docs.google.com/spreadsheets/d/1RA2_tIBjRvT6Dhou3Rc1rJvVF40yJuy1/edit?usp=sharing"
+url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
 
 # Criando a conexão com o Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
