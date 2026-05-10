@@ -7,10 +7,10 @@ from datetime import datetime
 # Configuração da página
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
-# Link da sua planilha Google
-url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
+# Link da sua planilha (AGORA APENAS O ID)
+url = "1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ"
 
-# Criando a conexão com o import correto!
+# Criando a conexão com o import correto
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- FUNÇÃO PARA CARREGAR DADOS ---
@@ -21,13 +21,13 @@ def carregar_dados():
         df_c = conn.read(spreadsheet=url, worksheet="Categories", ttl="0s")
         
         if not df_t.empty and 'Date' in df_t.columns:
-            # Garante formato brasileiro
+            # Garante formato brasileiro de data
             df_t['Date'] = pd.to_datetime(df_t['Date'], dayfirst=True, errors='coerce')
             df_t = df_t.dropna(subset=['Date'])
         
         return df_t, df_c
     except Exception as e:
-        # AGORA ELE VAI MOSTRAR O ERRO REAL NA TELA!
+        # O "dedo-duro" para mostrar erros reais
         st.error(f"🚨 O GOOGLE DISSE O SEGUINTE: {e}")
         return pd.DataFrame(columns=['Date', 'Type', 'Value', 'Category']), pd.DataFrame(columns=['Type', 'Category'])
 
@@ -81,20 +81,4 @@ with aba_graf:
         with col1:
             st.write("**Resumo por Categoria**")
             fig_bar = px.bar(df_transactions, x='Category', y='Value', color='Type',
-                             color_discrete_map={"Income": "blue", "Expense": "red"})
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-        with col2:
-            st.write("**Balanço Geral**")
-            summary = df_transactions.groupby("Type")["Value"].sum().reset_index()
-            fig_pie = px.pie(summary, values='Value', names='Type', 
-                             color='Type', color_discrete_map={"Income": "blue", "Expense": "red"})
-            st.plotly_chart(fig_pie, use_container_width=True)
-        
-        st.divider()
-        st.write("### Histórico de Movimentações")
-        df_view = df_transactions.copy()
-        df_view['Date'] = df_view['Date'].dt.strftime('%d/%m/%Y')
-        st.dataframe(df_view.sort_values(by='Date', ascending=False), use_container_width=True)
-    else:
-        st.info("Lance um valor para ver os gráficos.")
+                             color_discrete_map
