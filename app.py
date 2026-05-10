@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_gsheets_connection import GSheetsConnection
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
@@ -10,18 +10,18 @@ st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 # Link da sua planilha Google
 url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
 
-# Criando a conexão (Importante: a linha 2 do import deve estar correta no seu arquivo)
+# Criando a conexão com o import correto!
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # --- FUNÇÃO PARA CARREGAR DADOS ---
 def carregar_dados():
     try:
-        # Busca abas com nomes em inglês para máxima estabilidade
+        # Busca abas com nomes em inglês
         df_t = conn.read(spreadsheet=url, worksheet="Transactions", ttl="0s")
         df_c = conn.read(spreadsheet=url, worksheet="Categories", ttl="0s")
         
         if not df_t.empty and 'Date' in df_t.columns:
-            # Garante que o sistema entenda o formato de data brasileiro (Dia primeiro)
+            # Garante formato brasileiro
             df_t['Date'] = pd.to_datetime(df_t['Date'], dayfirst=True, errors='coerce')
             df_t = df_t.dropna(subset=['Date'])
         
@@ -42,7 +42,7 @@ with aba_in:
     st.subheader("Inserir Valor Recebido")
     val_in = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="in_val")
     
-    # Filtra por 'Income' (Entrada) na planilha
+    # Filtra por 'Income'
     list_cat_in = df_categories[df_categories['Type'] == 'Income']['Category'].tolist() if not df_categories.empty else []
     cat_in = st.selectbox("Selecione a Entrada", list_cat_in + ["Outra..."], key="in_cat")
     
@@ -60,7 +60,7 @@ with aba_out:
     st.subheader("Inserir Gasto")
     val_out = st.number_input("Valor (R$)", min_value=0.0, format="%.2f", key="out_val")
     
-    # Filtra por 'Expense' (Saída) na planilha
+    # Filtra por 'Expense'
     list_cat_out = df_categories[df_categories['Type'] == 'Expense']['Category'].tolist() if not df_categories.empty else []
     cat_out = st.selectbox("Selecione o tipo de Gasto", list_cat_out + ["Outra..."], key="out_cat")
     
