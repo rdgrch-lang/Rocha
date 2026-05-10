@@ -8,7 +8,7 @@ from datetime import datetime
 st.set_page_config(page_title="Gestão Financeira Rocha", layout="wide")
 
 # Link da sua planilha (AGORA APENAS O ID)
-url = "1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ"
+url = "https://docs.google.com/spreadsheets/d/1-znLPBb__mvWKp1HtJICdzE9gy47PWGfsPQDz1HzNMQ/edit?usp=sharing"
 
 # Criando a conexão com o import correto
 conn = st.connection("gsheets", type=GSheetsConnection)
